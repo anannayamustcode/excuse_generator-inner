@@ -218,12 +218,18 @@ const styles: StyleSheetCSS = {
     desktop: {
         minHeight: '100%',
         flex: 1,
-        backgroundColor: Colors.turquoise,
+        backgroundImage: `url(${process.env.PUBLIC_URL}/background.jpeg)`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
     },
     shutdown: {
         minHeight: '100%',
         flex: 1,
-        backgroundColor: '#1d2e2f',
+        backgroundImage: `url(${process.env.PUBLIC_URL}/background.jpeg)`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
     },
     shortcutContainer: {
         position: 'absolute',

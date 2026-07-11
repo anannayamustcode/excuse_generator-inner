@@ -372,7 +372,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                         {/* <div style={styles.eyebrow}>My Showcase</div> */}
                         <h2 style={styles.title}>Excuse Recommendation Assistant</h2>
                     </div>
-                    <div style={styles.badge}>Ranked • 5 picks</div>
+                    {/* <div style={styles.badge}>Ranked • 5 picks</div> */}
                 </div>
 
                 <div style={styles.layout}>
