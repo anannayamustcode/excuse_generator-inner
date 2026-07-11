@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Window from '../os/Window';
 import useInitialWindowSize from '../../hooks/useInitialWindowSize';
 
@@ -58,21 +58,31 @@ interface InputState {
     additionalContext: string;
 }
 
+/**
+ * Each template represents one "category" of excuse (illness, workload, etc).
+ * `variants` holds multiple phrasings so repeat use of the same category
+ * doesn't produce identical text every time. Variants can contain
+ * {{event}} and {{relationship}} tokens which get filled in from the form.
+ */
 interface ExcuseTemplate {
     id: string;
-    text: string;
     category: string;
+    variants: string[];
     relationshipSuitability: string[];
     eventSuitability: string[];
     noticeSuitability: string[];
     importanceSuitability: string[];
     toneSuitability: string[];
-    confidence: number;
+    baseConfidence: number;
     explanation: string;
-    avoidKeywords: string[];
+    keywords: string[]; // used to detect this category inside previous excuses / context
 }
 
-interface Recommendation extends ExcuseTemplate {
+interface Recommendation {
+    id: string;
+    category: string;
+    text: string;
+    explanation: string;
     score: number;
 }
 
@@ -90,110 +100,204 @@ const initialForm: InputState = {
     additionalContext: '',
 };
 
+const ALL_RELATIONSHIPS: RelationKey[] = ['Friend', 'Best Friend', 'Family', 'Date', 'Coworker', 'Boss', 'Client'];
+const ALL_EVENTS: EventKey[] = ['Coffee', 'Lunch', 'Dinner', 'Movie', 'Birthday', 'Party', 'Meeting', 'Trip', 'Interview'];
+const ALL_IMPORTANCE: ImportanceKey[] = ['Casual', 'Planned', 'Important', 'Very Important'];
+const ALL_NOTICE: NoticeKey[] = ['15 minutes', '1 hour', 'Today', 'Tomorrow', 'A few days', 'A week'];
+const ALL_TONE: ToneKey[] = ['Casual', 'Professional', 'Formal', 'Very apologetic'];
+
 const excuseTemplates: ExcuseTemplate[] = [
     {
         id: 'unexpected-issue',
-        text: 'I had an unexpected issue come up and need to handle it immediately.',
         category: 'logistics',
-        relationshipSuitability: ['Friend', 'Best Friend', 'Family', 'Coworker', 'Boss', 'Client', 'Date'],
-        eventSuitability: ['Coffee', 'Lunch', 'Dinner', 'Meeting', 'Movie', 'Birthday', 'Party'],
+        variants: [
+            "Something unexpected just came up and I need to deal with it right away.",
+            "I've hit an unexpected snag and have to sort it out before I can make {{event}}.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
+        eventSuitability: ALL_EVENTS,
         noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow'],
-        importanceSuitability: ['Casual', 'Planned', 'Important', 'Very Important'],
-        toneSuitability: ['Casual', 'Professional', 'Formal', 'Very apologetic'],
-        confidence: 0.92,
-        explanation: 'Best for last-minute cancellations with a straightforward, believable reason.',
-        avoidKeywords: ['illness', 'sick', 'flu'],
+        importanceSuitability: ALL_IMPORTANCE,
+        toneSuitability: ALL_TONE,
+        baseConfidence: 0.86,
+        explanation: 'A flexible, believable catch-all for short-notice cancellations.',
+        keywords: ['unexpected', 'issue', 'snag'],
     },
     {
         id: 'family-emergency',
-        text: 'A family matter came up that needs my attention right away.',
         category: 'family',
-        relationshipSuitability: ['Family', 'Best Friend', 'Friend', 'Coworker', 'Boss', 'Client', 'Date'],
+        variants: [
+            "A family matter came up that needs my attention right away.",
+            "Something's going on with my family that I need to handle today.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
         eventSuitability: ['Lunch', 'Dinner', 'Movie', 'Party', 'Birthday', 'Trip', 'Meeting'],
         noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow', 'A few days'],
         importanceSuitability: ['Planned', 'Important', 'Very Important'],
         toneSuitability: ['Professional', 'Formal', 'Very apologetic'],
-        confidence: 0.88,
-        explanation: 'Works well when the relationship is close and you want a reason that feels serious.',
-        avoidKeywords: ['family'],
+        baseConfidence: 0.85,
+        explanation: 'Reads as serious and non-negotiable — best when you want few follow-up questions.',
+        keywords: ['family', 'emergency', 'relative'],
     },
     {
         id: 'workload',
-        text: 'I have a heavier workload than expected and need to stay focused tonight.',
         category: 'workload',
-        relationshipSuitability: ['Coworker', 'Boss', 'Friend', 'Best Friend', 'Family'],
-        eventSuitability: ['Coffee', 'Lunch', 'Dinner', 'Meeting', 'Movie', 'Party', 'Birthday'],
+        variants: [
+            "I've got a heavier workload than expected and need to stay heads-down tonight.",
+            "Work piled up more than I planned for, so I need to skip {{event}} this time.",
+        ],
+        relationshipSuitability: ['Coworker', 'Boss', 'Friend', 'Best Friend', 'Family', 'Client'],
+        eventSuitability: ALL_EVENTS,
         noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow'],
         importanceSuitability: ['Casual', 'Planned', 'Important'],
         toneSuitability: ['Casual', 'Professional', 'Formal'],
-        confidence: 0.84,
-        explanation: 'A practical, low-drama excuse that suits casual to important plans.',
-        avoidKeywords: ['busy', 'work'],
+        baseConfidence: 0.82,
+        explanation: 'Practical and low-drama — plausible for coworkers and casual plans alike.',
+        keywords: ['work', 'busy', 'workload', 'deadline'],
     },
     {
         id: 'health',
-        text: 'I am not feeling well and do not want to risk showing up under the weather.',
         category: 'illness',
-        relationshipSuitability: ['Friend', 'Best Friend', 'Family', 'Date', 'Coworker', 'Boss'],
-        eventSuitability: ['Coffee', 'Lunch', 'Dinner', 'Movie', 'Birthday', 'Party', 'Meeting'],
+        variants: [
+            "I'm not feeling well and don't want to risk showing up under the weather.",
+            "I've come down with something and need to rest instead of making it to {{event}}.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
+        eventSuitability: ALL_EVENTS,
         noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow', 'A few days'],
-        importanceSuitability: ['Casual', 'Planned', 'Important', 'Very Important'],
-        toneSuitability: ['Casual', 'Professional', 'Formal', 'Very apologetic'],
-        confidence: 0.87,
-        explanation: 'A reliable option when you want to sound respectful without overexplaining.',
-        avoidKeywords: ['sick', 'flu', 'illness'],
+        importanceSuitability: ALL_IMPORTANCE,
+        toneSuitability: ALL_TONE,
+        baseConfidence: 0.84,
+        explanation: 'Universally accepted and rarely questioned, but overuse makes it less credible.',
+        keywords: ['sick', 'ill', 'flu', 'unwell', 'cold', 'fever'],
     },
     {
         id: 'prior-commitment',
-        text: 'I already have a prior commitment that I need to keep and cannot reschedule.',
         category: 'commitment',
-        relationshipSuitability: ['Friend', 'Best Friend', 'Family', 'Coworker', 'Boss', 'Client', 'Date'],
-        eventSuitability: ['Coffee', 'Lunch', 'Dinner', 'Movie', 'Party', 'Birthday', 'Meeting', 'Trip'],
+        variants: [
+            "I already have a prior commitment I need to keep and can't reschedule.",
+            "Turns out I double-booked myself — I have to honor the other commitment first.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
+        eventSuitability: ALL_EVENTS,
         noticeSuitability: ['1 hour', 'Today', 'Tomorrow', 'A few days', 'A week'],
-        importanceSuitability: ['Casual', 'Planned', 'Important', 'Very Important'],
+        importanceSuitability: ALL_IMPORTANCE,
         toneSuitability: ['Casual', 'Professional', 'Formal'],
-        confidence: 0.79,
-        explanation: 'Helpful for plans that were arranged earlier and need a steady, non-emotional explanation.',
-        avoidKeywords: ['commitment'],
+        baseConfidence: 0.78,
+        explanation: 'Steady and non-emotional — works best with more advance notice.',
+        keywords: ['commitment', 'booked', 'schedule'],
     },
     {
         id: 'travel-delay',
-        text: 'I am dealing with a travel delay and need to keep the day flexible.',
         category: 'travel',
-        relationshipSuitability: ['Friend', 'Best Friend', 'Family', 'Coworker', 'Boss', 'Client', 'Date'],
+        variants: [
+            "I'm dealing with a travel delay and need to keep my day flexible.",
+            "My travel plans got thrown off, so I can't lock in {{event}} right now.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
         eventSuitability: ['Coffee', 'Lunch', 'Dinner', 'Meeting', 'Trip', 'Interview'],
         noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow'],
         importanceSuitability: ['Planned', 'Important', 'Very Important'],
         toneSuitability: ['Professional', 'Formal', 'Very apologetic'],
-        confidence: 0.83,
-        explanation: 'Useful when timing is tight and the plan has a practical or professional angle.',
-        avoidKeywords: ['travel', 'delay'],
+        baseConfidence: 0.8,
+        explanation: "Useful when timing is tight and there's a plausible professional angle.",
+        keywords: ['travel', 'delay', 'flight', 'traffic', 'transit'],
     },
     {
-        id: 'personal-block',
-        text: 'I need a little personal space tonight and will have to sit this one out.',
-        category: 'personal',
+        id: 'personal-space',
+        category: 'personal-space',
+        variants: [
+            "I need a little personal space tonight and will have to sit this one out.",
+            "I'm running low on social energy and need a quiet night instead of {{event}}.",
+        ],
         relationshipSuitability: ['Friend', 'Best Friend', 'Family', 'Date'],
         eventSuitability: ['Coffee', 'Lunch', 'Dinner', 'Movie', 'Party', 'Birthday'],
         noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow', 'A few days'],
         importanceSuitability: ['Casual', 'Planned'],
         toneSuitability: ['Casual', 'Formal', 'Very apologetic'],
-        confidence: 0.76,
-        explanation: 'A softer excuse that can work for close relationships where a gentle boundary is enough.',
-        avoidKeywords: ['space', 'personal'],
+        baseConfidence: 0.72,
+        explanation: 'A gentle, honest boundary — best reserved for close relationships.',
+        keywords: ['space', 'alone', 'energy', 'introvert', 'tired'],
     },
     {
         id: 'client-issue',
-        text: 'A client issue needs my immediate attention, so I need to keep the evening free.',
-        category: 'professional',
+        category: 'professional-urgent',
+        variants: [
+            "A client issue needs my immediate attention, so I have to keep the evening free.",
+            "Something urgent came up on the client side and I need to stay on it.",
+        ],
         relationshipSuitability: ['Boss', 'Client', 'Coworker', 'Friend'],
         eventSuitability: ['Meeting', 'Dinner', 'Lunch', 'Coffee', 'Interview'],
         noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow'],
         importanceSuitability: ['Important', 'Very Important', 'Planned'],
         toneSuitability: ['Professional', 'Formal', 'Very apologetic'],
-        confidence: 0.9,
-        explanation: 'Strong for professional contexts where urgency and credibility matter.',
-        avoidKeywords: ['client', 'professional'],
+        baseConfidence: 0.87,
+        explanation: 'Strong for professional contexts where urgency and credibility matter most.',
+        keywords: ['client', 'professional', 'deadline', 'urgent'],
+    },
+    {
+        id: 'tech-failure',
+        category: 'technology',
+        variants: [
+            "I'm dealing with a tech problem — my {{event}} plans got derailed by it.",
+            "Something broke on my end (internet/car/etc.) and I need to get it sorted first.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
+        eventSuitability: ALL_EVENTS,
+        noticeSuitability: ['15 minutes', '1 hour', 'Today'],
+        importanceSuitability: ['Casual', 'Planned', 'Important'],
+        toneSuitability: ['Casual', 'Professional'],
+        baseConfidence: 0.74,
+        explanation: 'Casual and specific — best for informal plans with low stakes if questioned.',
+        keywords: ['car', 'internet', 'phone', 'broke', 'technical'],
+    },
+    {
+        id: 'weather',
+        category: 'weather',
+        variants: [
+            "The weather's turned bad enough that getting to {{event}} isn't safe right now.",
+            "Conditions outside are rough and I'd rather not risk the trip over.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
+        eventSuitability: ALL_EVENTS,
+        noticeSuitability: ['15 minutes', '1 hour', 'Today', 'Tomorrow'],
+        importanceSuitability: ['Casual', 'Planned', 'Important'],
+        toneSuitability: ['Casual', 'Professional', 'Formal'],
+        baseConfidence: 0.7,
+        explanation: 'Only credible if weather is plausible for your area — easy to verify, so use sparingly.',
+        keywords: ['weather', 'storm', 'snow', 'rain', 'roads'],
+    },
+    {
+        id: 'financial',
+        category: 'financial',
+        variants: [
+            "Some unexpected expenses came up and I need to hold off on plans that cost money right now.",
+            "I'm tightening my budget this week, so I'll need to skip {{event}}.",
+        ],
+        relationshipSuitability: ['Friend', 'Best Friend', 'Family', 'Date'],
+        eventSuitability: ['Dinner', 'Party', 'Trip', 'Movie'],
+        noticeSuitability: ['Today', 'Tomorrow', 'A few days', 'A week'],
+        importanceSuitability: ['Casual', 'Planned'],
+        toneSuitability: ['Casual', 'Formal'],
+        baseConfidence: 0.68,
+        explanation: 'Honest and relatable for close relationships, less suited to formal settings.',
+        keywords: ['money', 'budget', 'expensive', 'financial'],
+    },
+    {
+        id: 'scheduling-conflict',
+        category: 'scheduling',
+        variants: [
+            "My schedule just shifted and it's now conflicting with {{relationship}} plans I made earlier.",
+            "Something on my calendar moved and now it overlaps — I need to reschedule.",
+        ],
+        relationshipSuitability: ALL_RELATIONSHIPS,
+        eventSuitability: ALL_EVENTS,
+        noticeSuitability: ['1 hour', 'Today', 'Tomorrow', 'A few days', 'A week'],
+        importanceSuitability: ALL_IMPORTANCE,
+        toneSuitability: ['Professional', 'Formal'],
+        baseConfidence: 0.77,
+        explanation: 'Neutral and administrative — good when you want to avoid an emotional reason.',
+        keywords: ['schedule', 'conflict', 'calendar', 'overlap'],
     },
 ];
 
@@ -234,69 +338,145 @@ const importanceOptions: ImportanceKey[] = ['Casual', 'Planned', 'Important', 'V
 const noticeOptions: NoticeKey[] = ['15 minutes', '1 hour', 'Today', 'Tomorrow', 'A few days', 'A week'];
 const toneOptions: ToneKey[] = ['Casual', 'Professional', 'Formal', 'Very apologetic'];
 
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+/** Fills {{event}} / {{relationship}} tokens into a variant using the form's actual values. */
+const personalize = (text: string, state: InputState): string => {
+    const eventLabel =
+        state.event === 'Other' && state.eventCustom.trim()
+            ? state.eventCustom.trim()
+            : (state.event || 'our plans').toLowerCase();
+    const relationshipLabel =
+        state.relationship === 'Other' && state.relationshipCustom.trim()
+            ? state.relationshipCustom.trim()
+            : (state.relationship || 'you').toLowerCase();
+
+    return text.replace(/\{\{event\}\}/g, eventLabel).replace(/\{\{relationship\}\}/g, relationshipLabel);
+};
+
+/** Counts how strongly a category shows up in text the user already typed (previous excuses / context). */
+const categoryUsageScore = (text: string, template: ExcuseTemplate): number => {
+    if (!text) return 0;
+    const lower = text.toLowerCase();
+    return template.keywords.reduce((count, keyword) => (lower.includes(keyword) ? count + 1 : count), 0);
+};
+
+/**
+ * Weighted scoring: each matching field contributes a fixed weight so the
+ * total is easy to reason about, then previous-excuse overlap is subtracted
+ * so categories you've leaned on already drop down the list. A small jitter
+ * keeps repeated submissions with identical inputs from feeling static.
+ */
+const scoreTemplate = (template: ExcuseTemplate, state: InputState): number => {
+    let score = template.baseConfidence * 0.18;
+
+    if (state.relationship) {
+        if (template.relationshipSuitability.includes(state.relationship)) {
+            score += 0.2;
+        } else if (state.relationship === 'Other' && state.relationshipCustom) {
+            score += 0.05;
+        }
+    }
+
+    if (state.event) {
+        if (template.eventSuitability.includes(state.event)) {
+            score += 0.16;
+        } else if (state.event === 'Other' && state.eventCustom) {
+            score += 0.05;
+        }
+    }
+
+    if (state.importance && template.importanceSuitability.includes(state.importance)) {
+        score += 0.13;
+    }
+
+    if (state.notice && template.noticeSuitability.includes(state.notice)) {
+        score += 0.13;
+    }
+
+    if (state.tone && template.toneSuitability.includes(state.tone)) {
+        score += 0.1;
+    }
+
+    if (state.closeness) {
+        score += ['Close Friend', 'Best Friend', 'Family'].includes(state.closeness) ? 0.05 : 0.02;
+    }
+
+    const previousText = state.previousExcuses.join(' ');
+    const previousOverlap = categoryUsageScore(previousText, template);
+    score -= Math.min(0.4, previousOverlap * 0.16);
+
+    const contextOverlap = categoryUsageScore(state.additionalContext, template);
+    score += Math.min(0.06, contextOverlap * 0.03);
+
+    // Small deterministic-ish jitter so ties don't always resolve the same way.
+    score += (Math.random() - 0.5) * 0.02;
+
+    return clamp(score, 0.2, 0.99);
+};
+
+/**
+ * Greedy diversity selection (a simplified MMR): after scoring, pick the
+ * best remaining candidate but apply a growing penalty to categories
+ * already represented in the results, so the top picks aren't all the
+ * same flavor of excuse.
+ */
+const selectDiverseTopN = (
+    scored: { template: ExcuseTemplate; score: number }[],
+    n: number,
+): { template: ExcuseTemplate; score: number }[] => {
+    const pool = [...scored];
+    const picked: { template: ExcuseTemplate; score: number }[] = [];
+    const categoryCounts: Record<string, number> = {};
+
+    while (picked.length < n && pool.length > 0) {
+        let bestIndex = 0;
+        let bestAdjusted = -Infinity;
+
+        pool.forEach((candidate, index) => {
+            const penalty = (categoryCounts[candidate.template.category] || 0) * 0.18;
+            const adjusted = candidate.score - penalty;
+            if (adjusted > bestAdjusted) {
+                bestAdjusted = adjusted;
+                bestIndex = index;
+            }
+        });
+
+        const [chosen] = pool.splice(bestIndex, 1);
+        picked.push(chosen);
+        categoryCounts[chosen.template.category] = (categoryCounts[chosen.template.category] || 0) + 1;
+    }
+
+    return picked;
+};
+
+/** Picks the variant least similar to anything the user already typed as a previous excuse. */
+const pickVariant = (template: ExcuseTemplate, state: InputState): string => {
+    const previousLower = state.previousExcuses.join(' | ').toLowerCase();
+    const unused = template.variants.find((variant) => {
+        const bare = variant.replace(/\{\{event\}\}|\{\{relationship\}\}/g, '').toLowerCase().slice(0, 20);
+        return !previousLower.includes(bare);
+    });
+    return unused ?? template.variants[Math.floor(Math.random() * template.variants.length)];
+};
+
 const rankExcuses = (state: InputState): Recommendation[] => {
-    const normalizedPrevious = state.previousExcuses.join(' ').toLowerCase();
-    const contextText = `${state.additionalContext} ${state.relationshipCustom} ${state.eventCustom}`.toLowerCase();
+    const scored = excuseTemplates.map((template) => ({
+        template,
+        score: scoreTemplate(template, state),
+    }));
 
-    const scored = excuseTemplates
-        .map((template) => {
-            let score = template.confidence;
+    scored.sort((left, right) => right.score - left.score);
 
-            if (state.relationship) {
-                if (template.relationshipSuitability.includes(state.relationship)) {
-                    score += 0.12;
-                } else if (state.relationship === 'Other' && state.relationshipCustom) {
-                    score += 0.04;
-                }
-            }
+    const diversePicks = selectDiverseTopN(scored, 5);
 
-            if (state.event) {
-                if (template.eventSuitability.includes(state.event)) {
-                    score += 0.1;
-                } else if (state.event === 'Other' && state.eventCustom) {
-                    score += 0.04;
-                }
-            }
-
-            if (state.importance && template.importanceSuitability.includes(state.importance)) {
-                score += 0.08;
-            }
-
-            if (state.notice && template.noticeSuitability.includes(state.notice)) {
-                score += 0.08;
-            }
-
-            if (state.tone && template.toneSuitability.includes(state.tone)) {
-                score += 0.07;
-            }
-
-            if (state.closeness) {
-                const closenessBoost = ['Close Friend', 'Best Friend', 'Family'].includes(state.closeness)
-                    ? 0.04
-                    : 0.02;
-                score += closenessBoost;
-            }
-
-            if (normalizedPrevious) {
-                const repeats = template.avoidKeywords.some((keyword) => normalizedPrevious.includes(keyword));
-                if (repeats) {
-                    score -= 0.12;
-                }
-            }
-
-            if (contextText) {
-                const contextBoost = template.avoidKeywords.some((keyword) => contextText.includes(keyword));
-                if (contextBoost) {
-                    score -= 0.03;
-                }
-            }
-
-            return { ...template, score: Math.max(0.25, Math.min(0.99, score)) };
-        })
-        .sort((left, right) => right.score - left.score)
-        .slice(0, 5);
-
-    return scored;
+    return diversePicks.map(({ template, score }) => ({
+        id: template.id,
+        category: template.category,
+        text: personalize(pickVariant(template, state), state),
+        explanation: template.explanation,
+        score,
+    }));
 };
 
 const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
@@ -304,6 +484,40 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
     const [form, setForm] = useState<InputState>(initialForm);
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [showAll, setShowAll] = useState(false);
+    const clickAudioContextRef = useRef<AudioContext | null>(null);
+
+    const playClickSound = () => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioContextClass) {
+            return;
+        }
+
+        if (!clickAudioContextRef.current) {
+            clickAudioContextRef.current = new AudioContextClass();
+        }
+
+        const audioContext = clickAudioContextRef.current;
+        if (audioContext.state === 'suspended') {
+            void audioContext.resume();
+        }
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(760, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(560, audioContext.currentTime + 0.06);
+        gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.05, audioContext.currentTime + 0.004);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.11);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.11);
+    };
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -366,13 +580,11 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
             minimizeWindow={props.onMinimize}
             bottomLeftText="© Curated excuse recommendations"
         >
-            <div style={styles.shell}>
+            <div style={styles.shell} onMouseDown={playClickSound}>
                 <div style={styles.header}>
                     <div>
-                        {/* <div style={styles.eyebrow}>My Showcase</div> */}
                         <h2 style={styles.title}>Excuse Recommendation Assistant</h2>
                     </div>
-                    {/* <div style={styles.badge}>Ranked • 5 picks</div> */}
                 </div>
 
                 <div style={styles.layout}>
@@ -383,7 +595,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                                 <select
                                     value={form.relationship}
                                     onChange={(event) => handleChange(event, 'relationship')}
-                                    style={styles.input}
+                                    style={{ ...styles.input, cursor: 'pointer' }}
                                 >
                                     <option value="">Select one</option>
                                     {relationshipOptions.map((option) => (
@@ -407,7 +619,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                                 <select
                                     value={form.closeness}
                                     onChange={(event) => handleChange(event, 'closeness')}
-                                    style={styles.input}
+                                    style={{ ...styles.input, cursor: 'pointer' }}
                                 >
                                     <option value="">Select one</option>
                                     {closenessOptions.map((option) => (
@@ -423,7 +635,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                                 <select
                                     value={form.event}
                                     onChange={(event) => handleChange(event, 'event')}
-                                    style={styles.input}
+                                    style={{ ...styles.input, cursor: 'pointer' }}
                                 >
                                     <option value="">Select one</option>
                                     {eventOptions.map((option) => (
@@ -447,7 +659,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                                 <select
                                     value={form.importance}
                                     onChange={(event) => handleChange(event, 'importance')}
-                                    style={styles.input}
+                                    style={{ ...styles.input, cursor: 'pointer' }}
                                 >
                                     <option value="">Select one</option>
                                     {importanceOptions.map((option) => (
@@ -463,7 +675,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                                 <select
                                     value={form.notice}
                                     onChange={(event) => handleChange(event, 'notice')}
-                                    style={styles.input}
+                                    style={{ ...styles.input, cursor: 'pointer' }}
                                 >
                                     <option value="">Select one</option>
                                     {noticeOptions.map((option) => (
@@ -479,7 +691,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                                 <select
                                     value={form.tone}
                                     onChange={(event) => handleChange(event, 'tone')}
-                                    style={styles.input}
+                                    style={{ ...styles.input, cursor: 'pointer' }}
                                 >
                                     <option value="">Select one</option>
                                     {toneOptions.map((option) => (
@@ -558,6 +770,7 @@ const ShowcaseExplorer: React.FC<ShowcaseExplorerProps> = (props) => {
                                             <span style={styles.scorePill}>{(item.score * 100).toFixed(0)}%</span>
                                         </div>
                                         <div style={styles.mutedText}>{item.explanation}</div>
+                                        <div style={styles.categoryTag}>{item.category.replace(/-/g, ' ')}</div>
                                     </div>
                                 ))}
                             </div>
@@ -593,6 +806,7 @@ const styles: Record<string, React.CSSProperties> = {
         color: '#1f2937',
         overflow: 'auto',
         boxSizing: 'border-box',
+        cursor: 'default',
     },
     header: {
         display: 'flex',
@@ -610,7 +824,7 @@ const styles: Record<string, React.CSSProperties> = {
     },
     title: {
         margin: 0,
-        textAlign:'center',
+        textAlign: 'center',
         fontSize: 24,
         color: '#111827',
     },
@@ -655,8 +869,9 @@ const styles: Record<string, React.CSSProperties> = {
     },
     label: {
         fontWeight: 700,
-        fontSize: 13,
+        fontSize: 14,
         color: '#374151',
+        fontFamily: 'MillenniumBold, "Times New Roman", Times, serif',
     },
     input: {
         padding: '10px 12px',
@@ -664,6 +879,10 @@ const styles: Record<string, React.CSSProperties> = {
         border: '1px solid #cbd5e1',
         background: '#fff',
         color: '#111827',
+        fontFamily: 'Millennium, "Times New Roman", Times, serif',
+        fontSize: 15,
+        lineHeight: 1.4,
+        cursor: 'text',
     },
     textarea: {
         padding: '10px 12px',
@@ -673,6 +892,10 @@ const styles: Record<string, React.CSSProperties> = {
         minHeight: 96,
         resize: 'vertical',
         color: '#111827',
+        fontFamily: 'Millennium, "Times New Roman", Times, serif',
+        fontSize: 15,
+        lineHeight: 1.4,
+        cursor: 'text',
     },
     inlineRow: {
         display: 'flex',
@@ -718,6 +941,8 @@ const styles: Record<string, React.CSSProperties> = {
         color: '#fff',
         cursor: 'pointer',
         fontWeight: 700,
+        fontFamily: 'MillenniumBold, "Times New Roman", Times, serif',
+        fontSize: 14,
     },
     secondaryButton: {
         border: '1px solid #cbd5e1',
@@ -727,6 +952,8 @@ const styles: Record<string, React.CSSProperties> = {
         color: '#111827',
         cursor: 'pointer',
         fontWeight: 600,
+        fontFamily: 'Millennium, "Times New Roman", Times, serif',
+        fontSize: 14,
     },
     resultsHeader: {
         display: 'flex',
@@ -768,6 +995,8 @@ const styles: Record<string, React.CSSProperties> = {
         lineHeight: 1.4,
         cursor: 'pointer',
         userSelect: 'text',
+        fontFamily: 'Millennium, "Times New Roman", Times, serif',
+        fontSize: 15,
     },
     scorePill: {
         background: '#dcfce7',
@@ -782,6 +1011,16 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: 13,
         color: '#475569',
         lineHeight: 1.45,
+        fontFamily: 'Millennium, "Times New Roman", Times, serif',
+    },
+    categoryTag: {
+        alignSelf: 'flex-start',
+        fontSize: 11,
+        textTransform: 'capitalize',
+        color: '#5b6b86',
+        background: '#f1f5f9',
+        borderRadius: 999,
+        padding: '3px 8px',
     },
     resultBottomRow: {
         display: 'flex',
@@ -804,6 +1043,8 @@ const styles: Record<string, React.CSSProperties> = {
         fontWeight: 700,
         padding: 0,
         alignSelf: 'flex-start',
+        fontFamily: 'MillenniumBold, "Times New Roman", Times, serif',
+        fontSize: 14,
     },
 };
 
