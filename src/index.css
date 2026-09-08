@@ -266,6 +266,50 @@ input:active {
     overflow-y: scroll;
 }
 
+@media (max-width: 768px) {
+    .vertical-navbar {
+        width: 140px !important;
+        padding: 16px 12px !important;
+    }
+
+    .vertical-navbar h1 {
+        font-size: 22px !important;
+    }
+
+    .vertical-navbar h3 {
+        font-size: 11px !important;
+        margin-top: 4px !important;
+    }
+
+    .site-page-content {
+        margin-left: 140px !important;
+        padding: 16px 12px !important;
+        padding-top: 16px !important;
+    }
+
+    .site-page-content h1 {
+        font-size: 28px !important;
+        margin-left: 0 !important;
+    }
+
+    .site-page-content h2 {
+        font-size: 20px !important;
+    }
+
+    .site-page-content h3 {
+        font-size: 16px !important;
+    }
+
+    .site-page-content p {
+        font-size: 13px !important;
+    }
+
+    .text-block {
+        margin-top: 10px !important;
+        margin-bottom: 16px !important;
+    }
+}
+
 .router-link:visited {
     color: purple;
 }

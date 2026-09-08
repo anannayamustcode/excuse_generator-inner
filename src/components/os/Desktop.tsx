@@ -211,10 +211,15 @@ const Desktop: React.FC<DesktopProps> = (props) => {
             })}
             <div style={styles.shortcuts}>
                 {shortcuts.map((shortcut, i) => {
+                    const isSmallHeight = window.innerHeight < 460;
+                    const topPos = isSmallHeight ? (i % 3) * 88 : i * 104;
+                    const leftPos = isSmallHeight && i >= 3 ? 70 : 0;
+
                     return (
                         <div
                             style={Object.assign({}, styles.shortcutContainer, {
-                                top: i * 104,
+                                top: topPos,
+                                left: leftPos,
                             })}
                             key={shortcut.shortcutName}
                         >
