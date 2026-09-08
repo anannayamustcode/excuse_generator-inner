@@ -56,26 +56,13 @@ div {
     color: #fff;
 }
 
-/* Show rotate prompt only on small screens in portrait mode */
-@media (max-width: 900px) and (orientation: portrait) {
-    .desktop-app {
-        display: none !important;
-    }
-
-    .mobile-only-message {
-        display: flex !important;
-    }
+/* Allow mobile phones in both portrait and landscape mode to view the desktop app */
+.desktop-app {
+    display: flex !important;
 }
 
-/* Allow mobile phones in landscape mode to view the desktop app */
-@media (orientation: landscape) {
-    .desktop-app {
-        display: flex !important;
-    }
-
-    .mobile-only-message {
-        display: none !important;
-    }
+.mobile-only-message {
+    display: none !important;
 }
 
 

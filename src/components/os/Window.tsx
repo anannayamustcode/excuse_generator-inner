@@ -60,56 +60,121 @@ const Window: React.FC<WindowProps> = (props) => {
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
 
-    const startResize = (event: any) => {
-        event.preventDefault();
-        setIsResizing(true);
-        window.addEventListener('mousemove', onResize, false);
-        window.addEventListener('mouseup', stopResize, false);
+    const getClientCoords = (e: any) => {
+        if (e.touches && e.touches.length > 0) {
+            return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+        }
+        if (e.changedTouches && e.changedTouches.length > 0) {
+            return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY };
+        }
+        return { clientX: e.clientX, clientY: e.clientY };
     };
 
-    const onResize = ({ clientX, clientY }: any) => {
+    const startResize = (event: any) => {
+        if (event.cancelable) event.preventDefault();
+        setIsResizing(true);
+
+        const moveHandler = (e: any) => {
+            const coords = getClientCoords(e);
+            onResize(coords);
+        };
+
+        const stopHandler = () => {
+            stopResize(moveHandler, stopHandler);
+        };
+
+        window.addEventListener('mousemove', moveHandler, false);
+        window.addEventListener('mouseup', stopHandler, false);
+        window.addEventListener('touchmove', moveHandler, { passive: false });
+        window.addEventListener('touchend', stopHandler, false);
+    };
+
+    const onResize = ({ clientX, clientY }: { clientX: number; clientY: number }) => {
         const curWidth = clientX - left;
         const curHeight = clientY - top;
-        if (curWidth > 520) resizeRef.current.style.width = `${curWidth}px`;
-        if (curHeight > 220) resizeRef.current.style.height = `${curHeight}px`;
-        resizeRef.current.style.opacity = 1;
+        const minW = Math.min(220, window.innerWidth - 12);
+        const minH = 150;
+
+        if (curWidth >= minW && resizeRef.current) {
+            resizeRef.current.style.width = `${curWidth}px`;
+        }
+        if (curHeight >= minH && resizeRef.current) {
+            resizeRef.current.style.height = `${curHeight}px`;
+        }
+        if (resizeRef.current) {
+            resizeRef.current.style.opacity = 1;
+        }
     };
 
-    const stopResize = () => {
+    const stopResize = (moveHandler?: any, stopHandler?: any) => {
         setIsResizing(false);
-        setWidth(resizeRef.current.style.width);
-        setHeight(resizeRef.current.style.height);
-        resizeRef.current.style.opacity = 0;
-        window.removeEventListener('mousemove', onResize, false);
-        window.removeEventListener('mouseup', stopResize, false);
+        if (resizeRef.current) {
+            if (resizeRef.current.style.width) {
+                const newW = parseInt(resizeRef.current.style.width, 10);
+                if (!isNaN(newW)) setWidth(newW);
+            }
+            if (resizeRef.current.style.height) {
+                const newH = parseInt(resizeRef.current.style.height, 10);
+                if (!isNaN(newH)) setHeight(newH);
+            }
+            resizeRef.current.style.opacity = 0;
+        }
+        if (moveHandler && stopHandler) {
+            window.removeEventListener('mousemove', moveHandler);
+            window.removeEventListener('mouseup', stopHandler);
+            window.removeEventListener('touchmove', moveHandler);
+            window.removeEventListener('touchend', stopHandler);
+        }
     };
 
     const startDrag = (event: any) => {
-        const { clientX, clientY } = event;
+        const { clientX, clientY } = getClientCoords(event);
         setIsDragging(true);
-        event.preventDefault();
+        if (event.cancelable) event.preventDefault();
         dragProps.current = {
             dragStartX: clientX,
             dragStartY: clientY,
         };
-        window.addEventListener('mousemove', onDrag, false);
-        window.addEventListener('mouseup', stopDrag, false);
+
+        const moveHandler = (e: any) => {
+            const coords = getClientCoords(e);
+            onDrag(coords);
+        };
+
+        const stopHandler = (e: any) => {
+            const coords = getClientCoords(e);
+            stopDrag(coords, moveHandler, stopHandler);
+        };
+
+        window.addEventListener('mousemove', moveHandler, false);
+        window.addEventListener('mouseup', stopHandler, false);
+        window.addEventListener('touchmove', moveHandler, { passive: false });
+        window.addEventListener('touchend', stopHandler, false);
     };
 
-    const onDrag = ({ clientX, clientY }: any) => {
+    const onDrag = ({ clientX, clientY }: { clientX: number; clientY: number }) => {
         let { x, y } = getXYFromDragProps(clientX, clientY);
-        dragRef.current.style.transform = `translate(${x}px, ${y}px)`;
-        dragRef.current.style.opacity = 1;
+        if (dragRef.current) {
+            dragRef.current.style.transform = `translate(${x}px, ${y}px)`;
+            dragRef.current.style.opacity = 1;
+        }
     };
 
-    const stopDrag = ({ clientX, clientY }: any) => {
+    const stopDrag = (
+        { clientX, clientY }: { clientX: number; clientY: number },
+        moveHandler?: any,
+        stopHandler?: any
+    ) => {
         setIsDragging(false);
-        // dragRef.current.style.opacity = 0;
         const { x, y } = getXYFromDragProps(clientX, clientY);
         setTop(y);
         setLeft(x);
-        window.removeEventListener('mousemove', onDrag, false);
-        window.removeEventListener('mouseup', stopDrag, false);
+        if (moveHandler && stopHandler) {
+            window.removeEventListener('mousemove', moveHandler);
+            window.removeEventListener('mouseup', stopHandler);
+            window.removeEventListener('touchmove', moveHandler);
+            window.removeEventListener('touchend', stopHandler);
+        }
     };
 
     const getXYFromDragProps = (
@@ -126,20 +191,32 @@ const Window: React.FC<WindowProps> = (props) => {
     };
 
     useEffect(() => {
-        dragRef.current.style.transform = `translate(${left}px, ${top}px)`;
+        if (dragRef.current) {
+            dragRef.current.style.transform = `translate(${left}px, ${top}px)`;
+        }
     });
 
     useEffect(() => {
         if (window.innerWidth < 768 || window.innerHeight < 500) {
+            const isPortrait = window.innerHeight >= window.innerWidth;
             const maxW = window.innerWidth - 12;
-            const maxH = window.innerHeight - 36;
-            if (width > maxW) {
-                setWidth(Math.max(260, maxW));
+            const maxH = window.innerHeight - 44;
+
+            if (isPortrait) {
+                // In mobile portrait mode, window is set long/tall
+                setWidth(Math.max(280, maxW));
+                setHeight(Math.max(350, maxH));
                 setLeft(6);
-            }
-            if (height > maxH) {
-                setHeight(Math.max(200, maxH));
                 setTop(4);
+            } else {
+                if (width > maxW) {
+                    setWidth(Math.max(260, maxW));
+                    setLeft(6);
+                }
+                if (height > maxH) {
+                    setHeight(Math.max(200, maxH));
+                    setTop(4);
+                }
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,6 +298,7 @@ const Window: React.FC<WindowProps> = (props) => {
                         <div
                             style={styles.dragHitbox}
                             onMouseDown={startDrag}
+                            onTouchStart={startDrag}
                         ></div>
                         <div
                             className={props.rainbow ? 'rainbow-wrapper' : ''}
@@ -287,6 +365,7 @@ const Window: React.FC<WindowProps> = (props) => {
                         </div>
                         <div
                             onMouseDown={startResize}
+                            onTouchStart={startResize}
                             style={styles.resizeHitbox}
                         ></div>
                         <div style={styles.bottomBar}>
@@ -326,6 +405,8 @@ const Window: React.FC<WindowProps> = (props) => {
                                     styles.insetBorder,
                                     styles.bottomResizeContainer
                                 )}
+                                onMouseDown={startResize}
+                                onTouchStart={startResize}
                             >
                                 <div
                                     style={{
