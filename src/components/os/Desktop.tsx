@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ShowcaseExplorer from '../applications/ShowcaseExplorer';
+import OregonTrailApp from '../applications/OregonTrailApp';
+import HenordleApp from '../applications/HenordleApp';
+import MinesweeperApp from '../applications/MinesweeperApp';
+import SnakeApp from '../applications/SnakeApp';
 import ShutdownSequence from './ShutdownSequence';
 import Toolbar from './Toolbar';
 import DesktopShortcut, { DesktopShortcutProps } from './DesktopShortcut';
@@ -22,6 +26,30 @@ const APPLICATIONS: {
         name: 'My Showcase',
         shortcutIcon: 'showcaseIcon',
         component: ShowcaseExplorer,
+    },
+    minesweeper: {
+        key: 'minesweeper',
+        name: 'Minesweeper',
+        shortcutIcon: 'windowGameIcon',
+        component: MinesweeperApp,
+    },
+    snake: {
+        key: 'snake',
+        name: 'Snake',
+        shortcutIcon: 'windowGameIcon',
+        component: SnakeApp,
+    },
+    henordle: {
+        key: 'henordle',
+        name: 'Anordle',
+        shortcutIcon: 'henordleIcon',
+        component: HenordleApp,
+    },
+    trail: {
+        key: 'trail',
+        name: 'Oregon Trail',
+        shortcutIcon: 'trailIcon',
+        component: OregonTrailApp,
     },
 };
 

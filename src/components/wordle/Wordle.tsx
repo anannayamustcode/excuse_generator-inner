@@ -46,10 +46,8 @@ const KeyboardLetter: React.FC<KeyboardLetterProps> = ({
     const handleClick = () => {
         if (letter === 'RET') {
             if (currentGuess.length === word.length) {
-                if (WORDS.includes(currentGuess.toLowerCase())) {
-                    setGuesses([...guesses, currentGuess]);
-                    setCurrentGuess('');
-                }
+                setGuesses([...guesses, currentGuess]);
+                setCurrentGuess('');
             }
         } else if (letter === 'DEL') {
             setCurrentGuess(currentGuess.slice(0, -1));
@@ -144,7 +142,8 @@ const GuessWord: React.FC<GuessWordProps> = ({
             setSavedGuess(guess);
             if (
                 guess.length === word.length &&
-                !WORDS.includes(guess.toLowerCase())
+                !WORDS.includes(guess.toLowerCase()) &&
+                guess.toLowerCase() !== 'anannaya'
             ) {
                 controls
                     .start({
@@ -214,7 +213,7 @@ const ROWS = [TOP_ROW, MIDDLE_ROW, BOTTOM_ROW];
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 const Wordle: React.FC<WordleProps> = () => {
-    const word = 'HENRY';
+    const word = 'ANANNAYA';
     const [guesses, setGuesses] = useState<string[]>([]);
     const [gameOver, setGameOver] = useState(false);
     const [won, setWon] = useState(false);
@@ -236,10 +235,8 @@ const Wordle: React.FC<WordleProps> = () => {
                 setCurrentGuess(currentGuess.slice(0, -1));
             } else if (event.key === 'Enter') {
                 if (currentGuess.length === word.length) {
-                    if (WORDS.includes(currentGuess.toLowerCase())) {
-                        setGuesses([...guesses, currentGuess]);
-                        setCurrentGuess('');
-                    }
+                    setGuesses([...guesses, currentGuess]);
+                    setCurrentGuess('');
                 }
             } else if (
                 event.key.length === 1 &&
@@ -256,7 +253,7 @@ const Wordle: React.FC<WordleProps> = () => {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [guesses, currentGuess]);
+    }, [guesses, currentGuess, word.length]);
 
     useEffect(() => {
         if (guesses.length === 6) {
@@ -268,13 +265,13 @@ const Wordle: React.FC<WordleProps> = () => {
                 setWon(true);
             }
         });
-    }, [guesses]);
+    }, [guesses, word]);
 
     return (
         <div style={styles.container}>
             <div style={styles.header}>
-                <h2>Henordle</h2>
-                <p>Wordle but with a HENRY based twist.</p>
+                <h2>Anordle</h2>
+                <p>Wordle but with an ANANNAYA twist.</p>
             </div>
             <motion.div
                 variants={gameOverAnimations}
@@ -287,7 +284,7 @@ const Wordle: React.FC<WordleProps> = () => {
                 )}
             >
                 <h2>{won ? 'You win!' : 'Game Over'}</h2>
-                <p>Thanks for playing! Remember: the word is always "HENRY"!</p>
+                <p>Thanks for playing! Remember: the word is always "ANANNAYA"!</p>
                 <br />
                 <GuessWord
                     key={'winning-guess'}
@@ -408,7 +405,6 @@ const styles: StyleSheetCSS = {
     },
     keyboardContainer: {
         flexShrink: 1,
-
         paddingBottom: 24,
         flexDirection: 'column',
         justifyContent: 'center',
@@ -417,7 +413,6 @@ const styles: StyleSheetCSS = {
     playArea: {
         flex: 1,
         flexDirection: 'column',
-
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 16,
@@ -427,7 +422,6 @@ const styles: StyleSheetCSS = {
         padding: 12,
         paddingTop: 16,
         minWidth: 42,
-
         justifyContent: 'center',
         alignItems: 'center',
         paddingBottom: 16,
@@ -435,14 +429,16 @@ const styles: StyleSheetCSS = {
     },
     keyboardRow: {},
     guessLetterBox: {
-        width: 60,
-        height: 60,
+        width: 44,
+        height: 44,
         justifyContent: 'center',
         alignItems: 'center',
-
-        margin: 4,
+        margin: 2,
     },
-    guessWordRow: {},
+    guessWordRow: {
+        display: 'flex',
+        flexDirection: 'row',
+    },
     emptyBox: {
         border: '2px solid gray',
         backgroundColor: 'white',

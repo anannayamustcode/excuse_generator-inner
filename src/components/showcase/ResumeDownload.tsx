@@ -1,6 +1,5 @@
 import React from 'react';
 import printer from '../../assets/resume/printer.gif';
-import Resume from '../../assets/resume/Henry_Heffernan_S22_Resume.pdf';
 
 export interface ResumeDownloadProps {
     altText?: string;
@@ -12,8 +11,12 @@ const ResumeDownload: React.FC<ResumeDownloadProps> = ({ altText }) => {
             <img style={styles.resumePrinter} alt="" src={printer} />
             <div style={styles.resumeContainerText}>
                 <h3>{altText ? altText : 'Looking for my resume?'}</h3>
-                <a rel="noreferrer" target="_blank" href={Resume}>
-                    <p>Click here to download it!</p>
+                <a
+                    rel="noreferrer"
+                    target="_blank"
+                    href="mailto:anannayaagarwal@gmail.com?subject=Resume%20Request"
+                >
+                    <p>Click here to request a copy via email (anannayaagarwal@gmail.com)</p>
                 </a>
             </div>
         </div>

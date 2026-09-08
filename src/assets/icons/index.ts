@@ -13,6 +13,11 @@ import windowGameIcon from './windowGameIcon.png';
 import windowExplorerIcon from './windowExplorerIcon.png';
 import windowsStartIcon from './windowsStartIcon.png';
 import close from './close.png';
+import doomIcon from './doomIcon.png';
+import henordleIcon from './henordleIcon.png';
+import scrabbleIcon from './scrabbleIcon.png';
+import trailIcon from './trailIcon.png';
+import credits from './credits.png';
 
 const icons = {
     windowResize: windowResize,
@@ -28,6 +33,11 @@ const icons = {
     windowGameIcon: windowGameIcon,
     windowExplorerIcon: windowExplorerIcon,
     windowsStartIcon: windowsStartIcon,
+    doomIcon: doomIcon,
+    henordleIcon: henordleIcon,
+    scrabbleIcon: scrabbleIcon,
+    trailIcon: trailIcon,
+    credits: credits,
 };
 
 export type IconName = keyof typeof icons;

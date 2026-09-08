@@ -1,13 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import colors from '../../constants/colors';
-import twitterIcon from '../../assets/pictures/contact-twitter.png';
 import ghIcon from '../../assets/pictures/contact-gh.png';
 import inIcon from '../../assets/pictures/contact-in.png';
 import ResumeDownload from './ResumeDownload';
 
 export interface ContactProps {}
 
-// function to validate email
 const validateEmail = (email: string) => {
     const re =
         // eslint-disable-next-line
@@ -56,46 +54,41 @@ const Contact: React.FC<ContactProps> = (props) => {
         }
         try {
             setIsLoading(true);
-            const res = await fetch(
-                'https://api.henryheffernan.com/api/contact',
+            const response = await fetch(
+                'https://formsubmit.co/ajax/anannayaagarwal@gmail.com',
                 {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        Accept: 'application/json',
                     },
                     body: JSON.stringify({
-                        company,
-                        email,
                         name,
+                        email,
+                        company: company || 'N/A',
                         message,
+                        _subject: `New Portfolio Message from ${name}`,
                     }),
                 }
             );
-            // the response will be either {success: true} or {success: false, error: message}
-            const data = (await res.json()) as
-                | {
-                      success: false;
-                      error: string;
-                  }
-                | { success: true };
-            if (data.success) {
-                setFormMessage(`Message successfully sent. Thank you ${name}!`);
+
+            if (response.ok) {
+                setFormMessage(`Message sent successfully to anannayaagarwal@gmail.com! Thank you ${name}.`);
                 setCompany('');
                 setEmail('');
                 setName('');
                 setMessage('');
                 setFormMessageColor(colors.blue);
-                setIsLoading(false);
             } else {
-                setFormMessage(data.error);
-                setFormMessageColor(colors.red);
-                setIsLoading(false);
+                setFormMessage('Opening your mail client as fallback...');
+                setFormMessageColor(colors.blue);
+                window.location.href = `mailto:anannayaagarwal@gmail.com?subject=Portfolio%20Contact%20from%20${encodeURIComponent(name)}&body=${encodeURIComponent(message)}`;
             }
         } catch (e) {
-            setFormMessage(
-                'There was an error sending your message. Please try again.'
-            );
-            setFormMessageColor(colors.red);
+            setFormMessage('Opening mail client fallback...');
+            setFormMessageColor(colors.blue);
+            window.location.href = `mailto:anannayaagarwal@gmail.com?subject=Portfolio%20Contact%20from%20${encodeURIComponent(name)}&body=${encodeURIComponent(message)}`;
+        } finally {
             setIsLoading(false);
         }
     }
@@ -105,7 +98,7 @@ const Contact: React.FC<ContactProps> = (props) => {
             setTimeout(() => {
                 setFormMessage('');
                 setFormMessageColor('');
-            }, 4000);
+            }, 6000);
         }
     }, [formMessage]);
 
@@ -116,31 +109,28 @@ const Contact: React.FC<ContactProps> = (props) => {
                 <div style={styles.socials}>
                     <SocialBox
                         icon={ghIcon}
-                        link={'https://github.com/henryjeff'}
+                        link={'https://github.com/anannayamustcode/'}
                     />
                     <SocialBox
                         icon={inIcon}
-                        link={'https://www.linkedin.com/in/henryheffernan/'}
-                    />
-                    <SocialBox
-                        icon={twitterIcon}
-                        link={'https://twitter.com/henryheffernan'}
+                        link={'https://www.linkedin.com/in/anannaya-agarwal/'}
                     />
                 </div>
             </div>
             <div className="text-block">
                 <p>
-                    I am currently employed, however if you have any
-                    opportunities, feel free to reach out - I would love to
-                    chat! You can reach me via my personal email, or fill out
-                    the form below!
+                    If you have any opportunities or questions, feel free to reach out — I would love to chat! You can reach me via my personal email or fill out the form below.
                 </p>
                 <br />
                 <p>
                     <b>Email: </b>
-                    <a href="mailto:henryheffernan@gmail.com">
-                        henryheffernan@gmail.com
+                    <a href="mailto:anannayaagarwal@gmail.com">
+                        anannayaagarwal@gmail.com
                     </a>
+                </p>
+                <p>
+                    <b>Phone: </b>
+                    9179313462
                 </p>
 
                 <div style={styles.form}>
@@ -181,7 +171,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                     </label>
                     <input
                         style={styles.formItem}
-                        type="company"
+                        type="text"
                         name="company"
                         placeholder="Company"
                         value={company}
@@ -225,7 +215,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                                     <sub>
                                         {formMessage
                                             ? `${formMessage}`
-                                            : ' All messages get forwarded straight to my personal email'}
+                                            : ' Messages are delivered directly to anannayaagarwal@gmail.com'}
                                     </sub>
                                 </b>
                             </p>
@@ -233,8 +223,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                                 <sub>
                                     {!isFormValid ? (
                                         <span>
-                                            <b style={styles.star}>*</b> =
-                                            required
+                                            <b style={styles.star}>*</b> = required
                                         </span>
                                     ) : (
                                         '\xa0'
@@ -269,7 +258,6 @@ const styles: StyleSheetCSS = {
     },
     formInfo: {
         textAlign: 'right',
-
         flexDirection: 'column',
         alignItems: 'flex-end',
         paddingLeft: 24,
@@ -293,8 +281,6 @@ const styles: StyleSheetCSS = {
     social: {
         width: 4,
         height: 4,
-        // borderRadius: 1000,
-
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 8,

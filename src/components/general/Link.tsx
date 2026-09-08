@@ -1,6 +1,4 @@
-import React from 'react';
-import { useEffect } from 'react';
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 
 export interface LinkProps {
@@ -12,20 +10,20 @@ export interface LinkProps {
 
 const Link: React.FC<LinkProps> = (props) => {
     const navigate = useNavigate();
-
-    // get current location of react router
     const location = useLocation();
     const [isHere, setIsHere] = useState(false);
 
-    // if current path is the same as the link path
     useEffect(() => {
-        if (location.pathname === `/${props.to}`) {
+        const target = `/${props.to}`;
+        if (
+            location.pathname === target ||
+            (props.to === '' && location.pathname === '/')
+        ) {
             setIsHere(true);
         } else {
             setIsHere(false);
         }
-        return () => {};
-    }, [location, props.to]);
+    }, [location.pathname, props.to]);
 
     const [active, setActive] = useState(false);
 
@@ -33,9 +31,10 @@ const Link: React.FC<LinkProps> = (props) => {
         let isMounted = true;
         e.preventDefault();
         setActive(true);
-        if (location.pathname !== `/${props.to}`) {
+        const target = `/${props.to}`;
+        if (location.pathname !== target) {
             setTimeout(() => {
-                if (isMounted) navigate(`/${props.to}`);
+                if (isMounted) navigate(target);
             }, 100);
         }
         let t = setTimeout(() => {

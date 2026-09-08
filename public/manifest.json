@@ -1,6 +1,6 @@
 {
-    "short_name": "Henry Heffernan",
-    "name": "Henry Heffernan Portfolio Showcase 2022",
+    "short_name": "Anannaya Agarwal",
+    "name": "Anannaya Agarwal Portfolio Showcase",
     "icons": [
         {
             "src": "favicon.ico",
@@ -10,6 +10,7 @@
     ],
     "start_url": ".",
     "display": "standalone",
+    "orientation": "landscape",
     "theme_color": "#000000",
     "background_color": "#ffffff"
 }

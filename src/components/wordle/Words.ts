@@ -1,4 +1,5 @@
 const WORDS = [
+    'anannaya',
     'which',
     'there',
     'their',
