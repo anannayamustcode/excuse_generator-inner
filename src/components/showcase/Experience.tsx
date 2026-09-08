@@ -64,7 +64,7 @@ const Experience: React.FC<ExperienceProps> = (props) => {
                     </li>
                     <li>
                         <p>
-                            Built with Next.js, Tailwind CSS, Node.js, and MongoDB for seamless frontend–backend integration.
+                            Built with Next.js, Tailwind CSS, Node.js, and MongoDB for seamless frontend-backend integration.
                         </p>
                     </li>
                 </ul>

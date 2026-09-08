@@ -22,13 +22,13 @@ const About: React.FC<AboutProps> = (props) => {
                         target="_blank"
                         href="https://anannayamustcode.github.io/Project15/"
                     >
-                        this website (Project15)
+                        this website
                     </a>{' '}
                     actually.
                 </p>
                 <br />
                 <p>
-                    Turns out, I love coding. I chose engineering because I love math — and while there's not a ton of math here, it's still the coolest thing ever. This field might just be the most random one out there. Like what is:{' '}
+                    Turns out, I love coding. I chose engineering because I love math, and while there's not a ton of math here, it's still the coolest thing ever. This field might just be the most random one out there. Like what is:{' '}
                     <a
                         rel="noreferrer"
                         target="_blank"
@@ -55,7 +55,7 @@ const About: React.FC<AboutProps> = (props) => {
                 <p>
                     <b>Pune Institute of Computer Technology, Pune, Maharashtra</b>
                     <br />
-                    B.E. in Computer Engineering (2023 – 2027) | CGPA: 8.314
+                    B.E. in Computer Engineering (2023 – 2027) | CGPA: 8.5
                 </p>
                 <br />
                 <p>
@@ -97,7 +97,7 @@ const About: React.FC<AboutProps> = (props) => {
                 <ul>
                     <li>
                         <p>
-                            <b>Domain Coordinator – Computer Networks (Impetus):</b> Managed 100+ students, designed mentorship and evaluation flow for PICT's tech fest.
+                            <b>Domain Coordinator - Computer Networks (Impetus):</b> Managed 100+ students, designed mentorship and evaluation flow for PICT's tech fest.
                         </p>
                     </li>
                     <li>
@@ -107,7 +107,7 @@ const About: React.FC<AboutProps> = (props) => {
                     </li>
                     <li>
                         <p>
-                            <b>PASC – Marketing & Sponsorship Team:</b> Secured key sponsorships and elevated event reach by 40%.
+                            <b>PASC - Marketing & Sponsorship Team:</b> Secured key sponsorships and elevated event reach by 40%.
                         </p>
                     </li>
                 </ul>
