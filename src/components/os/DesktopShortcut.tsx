@@ -22,13 +22,20 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
     const containerRef = useRef<any>();
 
     const [scaledStyle, setScaledStyle] = useState({});
-
     const requiredIcon = require(`../../assets/icons/${icon}.png`);
     const [doubleClickTimerActive, setDoubleClickTimerActive] = useState(false);
 
+    // Draggable position offset for touch/mouse drag on mobile
+    const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const isDraggingRef = useRef(false);
+    const hasMovedRef = useRef(false);
+    const dragStartRef = useRef({ mouseX: 0, mouseY: 0, startX: 0, startY: 0 });
+
+    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || window.innerHeight < 500);
+
     const getShortcutId = useCallback(() => {
-        const shortcutId = shortcutName.replace(/\s/g, '');
-        return `desktop-shortcut-${shortcutId}`;
+        const id = shortcutName.replace(/\s/g, '');
+        return `desktop-shortcut-${id}`;
     }, [shortcutName]);
 
     useEffect(() => {
@@ -37,24 +44,19 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
 
     useEffect(() => {
         if (containerRef.current && Object.keys(scaledStyle).length === 0) {
-            //@ts-ignore
             const boundingBox = containerRef.current.getBoundingClientRect();
             setScaledStyle({
                 transformOrigin: 'center',
-                transform: 'scale(1.5)',
+                transform: isMobile ? 'scale(1.8)' : 'scale(1.5)',
                 left: boundingBox.width / 4,
                 top: boundingBox.height / 4,
-                // transform: 'scale(1.5)',
-                // left: boundingBox.width / 4,
-                // top: boundingBox.height / 4,
             });
         }
-    }, [scaledStyle]);
+    }, [scaledStyle, isMobile]);
 
     const handleClickOutside = useCallback(
         (event: MouseEvent) => {
-            // @ts-ignore
-            const targetId = event.target.id;
+            const targetId = (event.target as HTMLElement)?.id;
             if (targetId !== shortcutId) {
                 setIsSelected(false);
             }
@@ -62,42 +64,123 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
                 setLastSelected(false);
             }
         },
-        [isSelected, setIsSelected, setLastSelected, lastSelected, shortcutId]
+        [isSelected, lastSelected, shortcutId]
     );
-
-    const handleClickShortcut = useCallback(() => {
-        if (doubleClickTimerActive) {
-            onOpen && onOpen();
-            setIsSelected(false);
-            setDoubleClickTimerActive(false);
-            return;
-        }
-        setIsSelected(true);
-        setLastSelected(true);
-        setDoubleClickTimerActive(true);
-        // set double click timer
-        setTimeout(() => {
-            setDoubleClickTimerActive(false);
-        }, 300);
-    }, [doubleClickTimerActive, setIsSelected, onOpen]);
 
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isSelected, handleClickOutside]);
+    }, [handleClickOutside]);
+
+    const handleStart = (clientX: number, clientY: number) => {
+        isDraggingRef.current = true;
+        hasMovedRef.current = false;
+        dragStartRef.current = {
+            mouseX: clientX,
+            mouseY: clientY,
+            startX: dragOffset.x,
+            startY: dragOffset.y,
+        };
+    };
+
+    const handleMove = useCallback((clientX: number, clientY: number) => {
+        if (!isDraggingRef.current) return;
+        const dx = clientX - dragStartRef.current.mouseX;
+        const dy = clientY - dragStartRef.current.mouseY;
+
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+            hasMovedRef.current = true;
+        }
+
+        setDragOffset({
+            x: dragStartRef.current.startX + dx,
+            y: dragStartRef.current.startY + dy,
+        });
+    }, [dragOffset.x, dragOffset.y]);
+
+    const handleEnd = useCallback(() => {
+        if (!isDraggingRef.current) return;
+        isDraggingRef.current = false;
+
+        if (!hasMovedRef.current) {
+            const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || isMobile;
+            if (isTouch) {
+                onOpen && onOpen();
+                setIsSelected(false);
+            } else {
+                if (doubleClickTimerActive) {
+                    onOpen && onOpen();
+                    setIsSelected(false);
+                    setDoubleClickTimerActive(false);
+                } else {
+                    setIsSelected(true);
+                    setLastSelected(true);
+                    setDoubleClickTimerActive(true);
+                    setTimeout(() => {
+                        setDoubleClickTimerActive(false);
+                    }, 300);
+                }
+            }
+        }
+    }, [doubleClickTimerActive, isMobile, onOpen]);
+
+    const onMouseDown = (e: React.MouseEvent) => {
+        handleStart(e.clientX, e.clientY);
+
+        const onMouseMove = (ev: MouseEvent) => handleMove(ev.clientX, ev.clientY);
+        const onMouseUp = () => {
+            handleEnd();
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    };
+
+    const onTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            handleStart(touch.clientX, touch.clientY);
+        }
+
+        const onTouchMove = (ev: TouchEvent) => {
+            if (ev.touches.length > 0) {
+                const t = ev.touches[0];
+                handleMove(t.clientX, t.clientY);
+            }
+        };
+
+        const onTouchEnd = () => {
+            handleEnd();
+            window.removeEventListener('touchmove', onTouchMove);
+            window.removeEventListener('touchend', onTouchEnd);
+        };
+
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        window.addEventListener('touchend', onTouchEnd);
+    };
 
     return (
         <div
-            id={`${shortcutId}`}
-            style={Object.assign({}, styles.appShortcut, scaledStyle)}
-            onMouseDown={handleClickShortcut}
+            id={shortcutId}
+            style={Object.assign(
+                {},
+                styles.appShortcut,
+                scaledStyle,
+                (dragOffset.x !== 0 || dragOffset.y !== 0) && {
+                    transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) ${isMobile ? 'scale(1.8)' : 'scale(1.5)'}`,
+                }
+            )}
+            onMouseDown={onMouseDown}
+            onTouchStart={onTouchStart}
             ref={containerRef}
         >
-            <div id={`${shortcutId}`} style={styles.iconContainer}>
+            <div id={shortcutId} style={styles.iconContainer}>
                 <div
-                    id={`${shortcutId}`}
+                    id={shortcutId}
                     className="desktop-shortcut-icon"
                     style={Object.assign(
                         {},
@@ -118,11 +201,11 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
                         ? 'shortcut-border'
                         : ''
                 }
-                id={`${shortcutId}`}
+                id={shortcutId}
                 style={isSelected ? { backgroundColor: colors.blue } : {}}
             >
                 <p
-                    id={`${shortcutId}`}
+                    id={shortcutId}
                     style={Object.assign(
                         {},
                         styles.shortcutText,
@@ -140,11 +223,11 @@ const styles: StyleSheetCSS = {
     appShortcut: {
         position: 'absolute',
         width: 56,
-
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'column',
         textAlign: 'center',
+        touchAction: 'none',
     },
     shortcutText: {
         cursor: 'pointer',

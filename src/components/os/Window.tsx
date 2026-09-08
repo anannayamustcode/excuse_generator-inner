@@ -130,15 +130,17 @@ const Window: React.FC<WindowProps> = (props) => {
     });
 
     useEffect(() => {
-        const maxW = window.innerWidth - 12;
-        const maxH = window.innerHeight - 36;
-        if (width > maxW) {
-            setWidth(Math.max(260, maxW));
-            setLeft(6);
-        }
-        if (height > maxH) {
-            setHeight(Math.max(200, maxH));
-            setTop(4);
+        if (window.innerWidth < 768 || window.innerHeight < 500) {
+            const maxW = window.innerWidth - 12;
+            const maxH = window.innerHeight - 36;
+            if (width > maxW) {
+                setWidth(Math.max(260, maxW));
+                setLeft(6);
+            }
+            if (height > maxH) {
+                setHeight(Math.max(200, maxH));
+                setTop(4);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
