@@ -98,7 +98,7 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
             x: dragStartRef.current.startX + dx,
             y: dragStartRef.current.startY + dy,
         });
-    }, [dragOffset.x, dragOffset.y]);
+    }, []);
 
     const handleEnd = useCallback(() => {
         if (!isDraggingRef.current) return;
