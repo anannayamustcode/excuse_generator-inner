@@ -3,6 +3,35 @@ import { motion, useAnimation } from 'framer-motion';
 import WORDS from './Words';
 import { Easing } from '../general/Animation';
 
+type LetterStatus = 'correct' | 'present' | 'absent';
+
+const getLetterStatuses = (guess: string, word: string): LetterStatus[] => {
+    const statuses = Array<LetterStatus>(word.length).fill('absent');
+    const remainingLetters: Record<string, number> = {};
+
+    for (const letter of word) {
+        remainingLetters[letter] = (remainingLetters[letter] || 0) + 1;
+    }
+
+    for (let index = 0; index < word.length; index += 1) {
+        if (guess[index] === word[index]) {
+            statuses[index] = 'correct';
+            remainingLetters[guess[index]] -= 1;
+        }
+    }
+
+    for (let index = 0; index < word.length; index += 1) {
+        const letter = guess[index];
+        if (statuses[index] === 'correct') continue;
+        if (remainingLetters[letter] > 0) {
+            statuses[index] = 'present';
+            remainingLetters[letter] -= 1;
+        }
+    }
+
+    return statuses;
+};
+
 export interface KeyboardLetterProps {
     letter: string;
     word: string;
@@ -20,28 +49,17 @@ const KeyboardLetter: React.FC<KeyboardLetterProps> = ({
     setGuesses,
     setCurrentGuess,
 }) => {
-    const [isInWord, setIsInWord] = useState(false);
-    const [isInPlace, setIsInPlace] = useState(false);
-    const [notInWord, setNotInWord] = useState(false);
-
-    useEffect(() => {
-        guesses.forEach((guess) => {
-            if (word.includes(letter) && guess.includes(letter)) {
-                setIsInWord(true);
-                if (word.indexOf(letter) === guess.indexOf(letter)) {
-                    setIsInPlace(true);
-                }
-            }
-            if (!word.includes(letter) && guess.includes(letter)) {
-                setNotInWord(true);
-            }
-        });
-        if (guesses.length === 0) {
-            setIsInPlace(false);
-            setIsInWord(false);
-            setNotInWord(false);
-        }
-    }, [guesses, letter, word]);
+    const letterStatus = guesses.reduce<LetterStatus | null>((bestStatus, guess) => {
+        const statuses = getLetterStatuses(guess, word);
+        return guess.split('').reduce<LetterStatus | null>((guessStatus, guessLetter, index) => {
+            if (guessLetter !== letter) return guessStatus;
+            const status = statuses[index];
+            if (status === 'correct') return 'correct';
+            if (status === 'present' && guessStatus !== 'correct') return 'present';
+            if (status === 'absent' && !guessStatus) return 'absent';
+            return guessStatus;
+        }, bestStatus);
+    }, null);
 
     const handleClick = () => {
         if (letter === 'RET') {
@@ -63,9 +81,9 @@ const KeyboardLetter: React.FC<KeyboardLetterProps> = ({
             style={Object.assign(
                 {},
                 styles.letterBox,
-                isInWord && { backgroundColor: 'yellow' },
-                isInPlace && { backgroundColor: 'lightgreen' },
-                notInWord && { backgroundColor: 'gray' }
+                letterStatus === 'present' && { backgroundColor: 'yellow' },
+                letterStatus === 'correct' && { backgroundColor: 'lightgreen' },
+                letterStatus === 'absent' && { backgroundColor: 'red' }
             )}
         >
             <p>{letter}</p>
@@ -75,39 +93,24 @@ const KeyboardLetter: React.FC<KeyboardLetterProps> = ({
 
 export interface GuessLetterProps {
     letter: string;
-    word: string;
-    guess: string;
     guessed: boolean;
+    status?: LetterStatus;
 }
 
 const GuessLetter: React.FC<GuessLetterProps> = ({
     guessed,
     letter,
-    guess,
-    word,
+    status,
 }) => {
-    const [isInWord, setIsInWord] = useState(false);
-    const [isInPlace, setIsInPlace] = useState(false);
-
-    useEffect(() => {
-        if (guessed) {
-            if (word.includes(letter)) {
-                setIsInWord(true);
-                if (word.indexOf(letter) === guess.indexOf(letter)) {
-                    setIsInPlace(true);
-                }
-            }
-        }
-    }, [guessed, guess, letter, word]);
-
     return (
         <div
             className="button-border"
             style={Object.assign(
                 {},
                 styles.guessLetterBox,
-                isInWord && { backgroundColor: 'yellow' },
-                isInPlace && { backgroundColor: 'lightgreen' },
+                status === 'present' && { backgroundColor: 'yellow' },
+                status === 'correct' && { backgroundColor: 'lightgreen' },
+                status === 'absent' && { backgroundColor: 'red' },
                 !guessed && { backgroundColor: 'white' },
                 letter === ' ' && styles.emptyBox
             )}
@@ -136,6 +139,7 @@ const GuessWord: React.FC<GuessWordProps> = ({
 }) => {
     const [savedGuess, setSavedGuess] = useState(guess);
     const controls = useAnimation();
+    const statuses = getLetterStatuses(savedGuess, word);
 
     useEffect(() => {
         if (active) {
@@ -187,8 +191,7 @@ const GuessWord: React.FC<GuessWordProps> = ({
                     guessed={!active}
                     key={index}
                     letter={letter}
-                    guess={savedGuess}
-                    word={word}
+                    status={statuses[index]}
                 />
             ))}
             {[...Array(word.length - savedGuess.length)].map((e, i) => (
@@ -196,8 +199,6 @@ const GuessWord: React.FC<GuessWordProps> = ({
                     guessed={!active}
                     key={i}
                     letter={' '}
-                    guess={savedGuess}
-                    word={word}
                 />
             ))}
         </motion.div>
